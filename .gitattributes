@@ -1,0 +1,6 @@
+# Unix line endings for everything a Linux tool reads. A YAML or shell file saved on
+# Windows with CRLF endings can break in odd ways ("bash\r": No such file) - Week 5.
+*.sh    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.md    text eol=lf

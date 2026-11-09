@@ -1,0 +1,39 @@
+# Week 9 stretch goal: traffic from outside the cluster, with the Gateway API.
+# Keep this file OUT of your k8s/ folder (the marker's cluster has no Gateway controller).
+# It needs Envoy Gateway installed first - the lab page has the one command.
+#   kubectl apply -f gateway/gateway.yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller   # which controller runs it
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway                       # the entrance - owned by the platform team at work
+metadata:
+  name: eg
+spec:
+  gatewayClassName: eg
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute                     # the route - owned by your team
+metadata:
+  name: mine
+spec:
+  parentRefs:
+    - name: eg                      # attach to the Gateway above
+  hostnames:
+    - mine.local                    # requests with this Host header...
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: ____                # ...go to your Service (its metadata.name)
+          port: 80                  # the Service's own port

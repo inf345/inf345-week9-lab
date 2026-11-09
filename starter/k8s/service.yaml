@@ -1,0 +1,12 @@
+# M4 starter: one stable name in front of your Pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ____             # 23. the name other Pods will use: http://<this name>/
+spec:
+  selector:
+    app: ____            # 24. which Pods? the label from blanks 3 and 4
+  ports:
+    - name: http
+      port: 80           # the Service's own port: http://<name>/ means port 80
+      targetPort: ____   # 25. where to send the traffic in the Pod: your PORT, or the port's name

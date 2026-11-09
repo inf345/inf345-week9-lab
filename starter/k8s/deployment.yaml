@@ -1,0 +1,73 @@
+# M4 starter. Copy these files into k8s/ in your project, then fill every blank (four underscores).
+# The comment next to a blank is the question. Every blank is a decision from Monday.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ____                         # 1. your service's name, e.g. notes
+spec:
+  replicas: ____                     # 2. how many copies? at least 2 - one may fail while one serves
+  selector:
+    matchLabels:
+      app: ____                      # 3. the label this Deployment owns
+  template:
+    metadata:
+      labels:
+        app: ____                    # 4. the label every Pod gets - the same as 3
+    spec:
+      securityContext:
+        runAsNonRoot: ____           # 5. refuse to start as root (week 5: USER 1000:1000)
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          # 6. your M3 image: ghcr.io/<owner>/<project> in lowercase, a colon, the FULL 40-character SHA
+          image: ghcr.io/____/____:____
+          ports:
+            - name: http
+              containerPort: ____    # 7. the number your ConfigMap gives PORT
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ____         # 8. the name of your ConfigMap (configmap.yaml)
+                  key: PORT
+            - name: ____             # 9. one more setting your app reads, from the same ConfigMap
+              valueFrom:
+                configMapKeyRef:
+                  name: ____         #    (the same ConfigMap as 8)
+                  key: ____          #    (a key you put in configmap.yaml)
+            - name: ____             # 10. a secret your app reads, e.g. API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret   # fixed name: you and the marker create it; it is never in Git
+                  key: ____          #    the key inside app-secret - you choose it
+          readinessProbe:            # "should this Pod get traffic now?"
+            httpGet:
+              path: ____             # 11. your contract's health endpoint
+              port: ____             # 12. which port? the name of the port above works
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:             # "should this container be restarted?"
+            httpGet:
+              path: ____             # 13. the same endpoint as 11
+              port: ____             # 14. the same port as 12
+            periodSeconds: ____      # 15. how often? readiness should notice before liveness acts
+            failureThreshold: 3
+          resources:
+            requests:                # what the scheduler reserves for one Pod
+              cpu: ____              # 16. e.g. 50m = 5% of one CPU
+              memory: ____           # 17. e.g. 64Mi (Java: see the language table)
+            limits:                  # the ceiling: over the memory limit, the container is killed
+              cpu: ____              # 18. at least the request
+              memory: ____           # 19. at least the request
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp              # a writable /tmp, because the root filesystem is read-only
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

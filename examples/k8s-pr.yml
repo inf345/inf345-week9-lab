@@ -1,0 +1,89 @@
+# Optional, and not marked: test your k8s/ in a real cluster on every pull request.
+# Copy to .github/workflows/k8s.yml in YOUR project and fill the four ____ blanks.
+# It does what the M4 marker does first: a throwaway kind cluster on GitHub's machine,
+# the Secret created with a random value, a server-side dry run, apply, wait for the
+# rollout, and /healthz through your Service. The last step runs the marker itself.
+name: Kubernetes
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy k8s/ to a throwaway cluster
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      DEPLOYMENT: ____        # 1. metadata.name of your Deployment
+      SERVICE: ____           # 2. metadata.name of your Service
+      SERVICE_PORT: "____"    # 3. the Service's own port (port:, not targetPort:)
+      SECRET_KEY: ____        # 4. the key your Deployment reads from app-secret
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0      # the marker reads the whole history
+
+      - name: Install kind and kubectl - pinned versions, checksums checked
+        env:
+          KIND_VERSION: v0.33.0
+          KIND_SHA256: aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d
+          KUBECTL_VERSION: v1.37.1
+          KUBECTL_SHA512: decde4d990d0fbf6451e65524dec42c549de3339f27005c45af8d3c61cca1de852524ebf2215c82be86d4ab2621c823f56f718b8d2c304b9100a903e696c0c32
+        run: |
+          curl -fsSLo kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+          echo "${KIND_SHA256}  kind" | sha256sum -c -
+          curl -fsSLO "https://dl.k8s.io/${KUBECTL_VERSION}/kubernetes-client-linux-amd64.tar.gz"
+          echo "${KUBECTL_SHA512}  kubernetes-client-linux-amd64.tar.gz" | sha512sum -c -
+          tar -xzf kubernetes-client-linux-amd64.tar.gz kubernetes/client/bin/kubectl
+          sudo install -m 0755 kind kubernetes/client/bin/kubectl /usr/local/bin/
+
+      - name: Create a cluster - Kubernetes 1.37.0, pinned by digest
+        run: |
+          kind create cluster --name ci --wait 180s \
+            --image kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+
+      - name: Create app-secret - a random value, never in Git
+        run: kubectl create secret generic app-secret --from-literal="${SECRET_KEY}=$(openssl rand -hex 16)"
+
+      - name: Server-side dry run - the API server checks every field
+        run: kubectl apply --dry-run=server -f k8s/
+
+      - name: Apply, and wait until every Pod is ready
+        run: |
+          kubectl apply -f k8s/
+          kubectl rollout status "deployment/${DEPLOYMENT}" --timeout=180s
+
+      - name: Call /healthz through the Service
+        run: kubectl get --raw "/api/v1/namespaces/default/services/${SERVICE}:${SERVICE_PORT}/proxy/healthz"
+
+      - name: What went wrong? (runs only if a step failed)
+        if: failure()
+        run: |
+          kubectl get pods -o wide || true
+          kubectl describe pods || true
+          kubectl get events --sort-by=.lastTimestamp || true
+          kubectl logs "deployment/${DEPLOYMENT}" --all-containers --tail=50 || true
+
+      # The M4 marker, on the same cluster: the freeze test and the random PORT too.
+      # It adds a few minutes. Delete these three steps if you do not want them.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: python -m pip install --quiet pyyaml==6.0.3
+      - name: Run the M4 marker
+        run: |
+          curl -fsSLO https://raw.githubusercontent.com/inf345/inf345-week9-lab/main/mark_m4.py
+          python mark_m4.py --path . --kind-cluster ci
