@@ -964,7 +964,7 @@ class Cluster:
         return None if data is None else (data.get("items") or [])
 
     def healthz(self, ns, service, port):
-        rc, out, err = self.kubectl("get", "--request-timeout=5s", "--raw",
+        rc, out, err = self.kubectl("get", "--raw",
                                     f"/api/v1/namespaces/{ns}/services/{service}:{port}/proxy/healthz",
                                     timeout=20)
         return rc == 0, short(out if rc == 0 else err, 160)
